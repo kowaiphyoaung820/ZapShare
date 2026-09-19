@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZapShare — P2P ဖိုင်လွှဲပြောင်းရေး</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 16px;
+    font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans Myanmar", sans-serif;
+    background: linear-gradient(135deg, #0f172a, #1e293b);
+    color: #e2e8f0; min-height: 100vh;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; color: #38bdf8; }
+  .sub { font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
+  .card {
+    background: #1e293b; border: 1px solid #334155;
+    border-radius: 14px; padding: 16px; margin-bottom: 14px;
+  }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab {
+    flex: 1; padding: 12px; text-align: center; border-radius: 10px;
+    background: #0f172a; border: 1px solid #334155;
+    cursor: pointer; font-weight: 600; color: #94a3b8;
+    transition: .2s;
+  }
+  .tab.active { background: #0284c7; color: #fff; border-color: #0284c7; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  textarea {
+    width: 100%; height: 110px; padding: 10px;
+    background: #0f172a; color: #e2e8f0;
+    border: 1px solid #334155; border-radius: 10px;
+    font-family: monospace; font-size: 12px; resize: vertical;
+  }
+  button {
+    width: 100%; padding: 13px; margin-top: 10px;
+    background: #0284c7; color: #fff; border: none;
+    border-radius: 10px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: .2s;
+  }
+  button:active { transform: scale(.98); }
+  button.secondary { background: #334155; }
+  button.success  { background: #059669; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .status {
+    font-size: 13px; padding: 10px; border-radius: 8px;
+    background: #0f172a; margin-top: 10px; color: #94a3b8;
+  }
+  .status.ok   { color: #34d399; }
+  .status.err  { color: #f87171; }
+  .status.wait { color: #fbbf24; }
+  .file-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; background: #0f172a; border-radius: 8px;
+    margin-top: 6px; font-size: 13px;
+  }
+  .file-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; margin-right: 8px; }
+  .progress-wrap {
+    margin-top: 8px; background: #0f172a;
+    border-radius: 8px; overflow: hidden; height: 10px;
+  }
+  .progress-bar {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #06b6d4, #3b82f6);
+    transition: width .15s;
+  }
+  .progress-text { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .hidden { display: none; }
+  input[type=file] { display: none; }
+  label.file-btn {
+    display: block; text-align: center; padding: 13px;
+    background: #0f172a; border: 1px dashed #475569;
+    border-radius: 10px; cursor: pointer; color: #94a3b8;
+    font-weight: 600;
+  }
+  label.file-btn:active { background: #1e293b; }
+  .hint { font-size: 12px; color: #64748b; margin-top: 8px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<h1>⚡ ZapShare</h1>
+<div class="sub">P2P ဖိုင်လွှဲပြောင်းရေး — server မလို၊ တိုက်ရိုက်</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="send">📤 ပို့မယ်</div>
+  <div class="tab" data-tab="receive">📥 လက်ခံမယ်</div>
+</div>
+
+<!-- ============ SEND PANEL ============ -->
+<div class="panel active" id="panel-send">
+  <div class="card">
+    <b>အဆင့် ၁ — Offer ဖန်တီး</b>
+    <button id="btnCreateOffer">Offer Code ဖန်တီး</button>
+    <textarea id="offerOut" placeholder="Offer code ဒီမှာ ပေါ်လာမယ်..." readonly></textarea>
+    <button class="secondary" id="btnCopyOffer">📋 Copy Offer</button>
+    <div class="hint">ဒီ code ကို လက်ခံမယ့်ဖုန်းဆီ ပို့ပါ (Messenger/SMS စသဖြင့်)။</div>
+  </div>
+
+  <div class="card">
+    <b>အဆင့် ၂ — Answer ထည့်</b>
+    <textarea id="answerIn" placeholder="လက်ခံသူဆီက Answer code ကို ဒီမှာ paste လုပ်ပါ..."></textarea>
+    <button class="success" id="btnAcceptAnswer">ချိတ်ဆက်</button>
+    <div class="status" id="sendStatus">စောင့်ဆိုင်းနေသည်...</div>
+  </div>
+
+  <div class="card" id="sendFileCard" style="display:none">
+    <b>အဆင့် ၃ — ဖိုင်ပို့</b>
+    <label class="file-btn" for="fileInput">📎 ဖိုင်ရွေးရန်</label>
+    <input type="file" id="fileInput" multiple>
+    <div id="sendFileList"></div>
+    <div class="progress-wrap hidden" id="sendProgressWrap">
+      <div class="progress-bar" id="sendProgressBar"></div>
+    </div>
+    <div class="progress-text hidden" id="sendProgressText"></div>
+  </div>
+</div>
+
+<!-- ============ RECEIVE PANEL ============ -->
+<div class="panel" id="panel-receive">
+  <div class="card">
+    <b>အဆင့် ၁ — Offer ထည့်</b>
+    <textarea id="offerIn" placeholder="ပို့သူဆီက Offer code ကို ဒီမှာ paste လုပ်ပါ..."></textarea>
+    <button id="btnProcessOffer">Offer ဖတ်ပြီး Answer ဖန်တီး</button>
+    <div class="status" id="recvStatus">စောင့်ဆိုင်းနေသည်...</div>
+  </div>
+
+  <div class="card" id="answerCard" style="display:none">
+    <b>အဆင့် ၂ — Answer ပို့</b>
+    <textarea id="answerOut" placeholder="Answer code ဒီမှာ ပေါ်လာမယ်..." readonly></textarea>
+    <button class="secondary" id="btnCopyAnswer">📋 Copy Answer</button>
+    <div class="hint">ဒီ Answer code ကို ပို့သူဆီ ပြန်ပို့ပါ။</div>
+  </div>
+
+  <div class="card" id="recvFileCard" style="display:none">
+    <b>📥 လက်ခံရရှိမယ့် ဖိုင်</b>
+    <div id="recvFileList"></div>
+    <div class="progress-wrap hidden" id="recvProgressWrap">
+      <div class="progress-bar" id="recvProgressBar"></div>
+    </div>
+    <div class="progress-text hidden" id="recvProgressText"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ZapShare — WebRTC P2P File Transfer (single-file)
+   ============================================================ */
+
+const CHUNK_SIZE = 16 * 1024;           // 16 KB per chunk
+const BUFFER_THRESHOLD = 1024 * 1024;   // 1 MB
+
+let pc = null;
+let dataChannel = null;
+let role = null;  // 'send' | 'receive'
+
+// Receive state
+let recvFileMeta = null;
+let recvChunks = [];
+let recvReceived = 0;
+let currentIncomingFile = null;
+
+// Send state
+let sendFiles = [];
+let sendIndex = 0;
+let sendOffset = 0;
+let isSending = false;
+
+/* ---------- UI helpers ---------- */
+const $ = id => document.getElementById(id);
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    $('panel-' + t.dataset.tab).classList.add('active');
+  };
+});
+
+function setStatus(el, text, cls = '') {
+  el.textContent = text;
+  el.className = 'status ' + cls;
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + ' MB';
+  return (b/1073741824).toFixed(2) + ' GB';
+}
+
+/* ============================================================
+   WebRTC Peer Connection setup
+   ============================================================ */
+function createPeerConnection() {
+  const config = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+  };
+  const peer = new RTCPeerConnection(config);
+
+  peer.onicecandidate = e => {
+    // ICE trickle disabled — we wait for complete ICE
+  };
+
+  peer.onconnectionstatechange = () => {
+    const s = peer.connectionState;
+    if (s === 'connected') {
+      if (role === 'send') {
+        setStatus($('sendStatus'), '✅ ချိတ်ဆက်ပြီးပါပြီ', 'ok');
+        $('sendFileCard').style.display = 'block';
+      } else {
+        setStatus($('recvStatus'), '✅ ချိတ်ဆက်ပြီးပါပြီ', 'ok');
+      }
+    } else if (s === 'failed' || s === 'disconnected') {
+      const el = role === 'send' ? $('sendStatus') : $('recvStatus');
+      setStatus(el, '❌ ချိတ်ဆက်မှု ပြတ်သွားသည် (' + s + ')', 'err');
+    }
+  };
+
+  return peer;
+}
+
+/* Wait for ICE gathering to complete (for single-shot SDP) */
+function waitForIce(pc) {
+  return new Promise(resolve => {
+    if (pc.iceGatheringState === 'complete') return resolve();
+    const check = () => {
+      if (pc.iceGatheringState === 'complete') {
+        pc.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      }
+    };
+    pc.addEventListener('icegatheringstatechange', check);
+    setTimeout(resolve, 3000); // fallback timeout
+  });
+}
+
+/* ============================================================
+   SENDER
+   ============================================================ */
+$('btnCreateOffer').onclick = async () => {
+  role = 'send';
+  try {
+    pc = createPeerConnection();
+    dataChannel = pc.createDataChannel('fileTransfer', { ordered: true });
+    setupDataChannel();
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitForIce(pc);
+
+    // Compress SDP (remove unnecessary whitespace)
+    const sdp = JSON.stringify({ type: 'offer', sdp: pc.localDescription.sdp });
+    $('offerOut').value = btoa(sdp);
+    setStatus($('sendStatus'), '📋 Offer ဖန်တီးပြီး — လက်ခံသူဆီ ပို့ပါ', 'wait');
+  } catch (e) {
+    setStatus($('sendStatus'), '❌ Error: ' + e.message, 'err');
+  }
+};
+
+$('btnAcceptAnswer').onclick = async () => {
+  role = 'send';
+  const code = $('answerIn').value.trim();
+  if (!code) return alert('Answer code ထည့်ပါ');
+  try {
+    const answer = JSON.parse(atob(code));
+    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    setStatus($('sendStatus'), '⏳ ချိတ်ဆက်နေသည်...', 'wait');
+  } catch (e) {
+    setStatus($('sendStatus'), '❌ Answer မမှန်ပါ: ' + e.message, 'err');
+  }
+};
+
+$('btnCopyOffer').onclick = () => {
+  $('offerOut').select();
+  document.execCommand('copy');
+  alert('Offer copied ✅');
+};
+
+/* ============================================================
+   RECEIVER
+   ============================================================ */
+$('btnProcessOffer').onclick = async () => {
+  role = 'receive';
+  const code = $('offerIn').value.trim();
+  if (!code) return alert('Offer code ထည့်ပါ');
+  try {
+    pc = createPeerConnection();
+    pc.ondatachannel = e => {
+      dataChannel = e.channel;
+      setupDataChannel();
+    };
+
+    const offer = JSON.parse(atob(code));
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitForIce(pc);
+
+    const sdp = JSON.stringify({ type: 'answer', sdp: pc.localDescription.sdp });
+    $('answerOut').value = btoa(sdp);
+    $('answerCard').style.display = 'block';
+    $('recvFileCard').style.display = 'block';
+    setStatus($('recvStatus'), '📋 Answer ဖန်တီးပြီး — ပို့သူဆီ ပြန်ပို့ပါ', 'wait');
+  } catch (e) {
+    setStatus($('recvStatus'), '❌ Offer မမှန်ပါ: ' + e.message, 'err');
+  }
+};
+
+$('btnCopyAnswer').onclick = () => {
+  $('answerOut').select();
+  document.execCommand('copy');
+  alert('Answer copied ✅');
+};
+
+/* ============================================================
+   DataChannel — shared setup
+   ============================================================ */
+function setupDataChannel() {
+  dataChannel.binaryType = 'arraybuffer';
+
+  dataChannel.onopen = () => {
+    if (role === 'send') {
+      setStatus($('sendStatus'), '✅ Channel ဖွင့်ပြီး — ဖိုင်ပို့နိုင်ပြီ', 'ok');
+      $('sendFileCard').style.display = 'block';
+    } else {
+      setStatus($('recvStatus'), '✅ Channel ဖွင့်ပြီး — ဖိုင် စောင့်နေသည်', 'ok');
+    }
+  };
+
+  dataChannel.onclose = () => {
+    const el = role === 'send' ? $('sendStatus') : $('recvStatus');
+    setStatus(el, '⚠️ Channel ပိတ်သွားသည်', 'err');
+  };
+
+  dataChannel.onerror = e => {
+    console.error('DC error', e);
+  };
+
+  dataChannel.onmessage = handleMessage;
+}
+
+/* ============================================================
+   SENDER — File handling
+   ============================================================ */
+$('fileInput').onchange = e => {
+  sendFiles = Array.from(e.target.files);
+  renderSendFiles();
+};
+
+function renderSendFiles() {
+  const box = $('sendFileList');
+  box.innerHTML = '';
+  sendFiles.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'file-row';
+    row.innerHTML = `<span class="name">${i+1}. ${f.name}</span>
+                     <span>${formatBytes(f.size)}</span>`;
+    box.appendChild(row);
+  });
+  if (sendFiles.length && dataChannel && dataChannel.readyState === 'open') {
+    startSending();
+  }
+}
+
+async function startSending() {
+  if (isSending || !sendFiles.length) return;
+  isSending = true;
+  sendIndex = 0;
+  $('sendProgressWrap').classList.remove('hidden');
+  $('sendProgressText').classList.remove('hidden');
+
+  for (let i = 0; i < sendFiles.length; i++) {
+    sendIndex = i;
+    const file = sendFiles[i];
+    sendOffset = 0;
+
+    // send metadata
+    dataChannel.send(JSON.stringify({
+      type: 'meta',
+      name: file.name,
+      size: file.size,
+      mime: file.type || 'application/octet-stream'
+    }));
+
+    await sendFileChunks(file);
+  }
+
+  dataChannel.send(JSON.stringify({ type: 'done' }));
+  $('sendProgressText').textContent = '✅ အားလုံး ပို့ပြီးပါပြီ';
+  isSending = false;
+}
+
+function sendFileChunks(file) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    const total = file.size;
+
+    function readSlice(start) {
+      const slice = file.slice(start, start + CHUNK_SIZE);
+      reader.readAsArrayBuffer(slice);
+    }
+
+    reader.onload = e => {
+      // wait for buffer to drain
+      if (dataChannel.bufferedAmount > BUFFER_THRESHOLD) {
+        setTimeout(() => {
+          dataChannel.send(e.target.result);
+          advance();
+        }, 20);
+      } else {
+        dataChannel.send(e.target.result);
+        advance();
+      }
+    };
+
+    function advance() {
+      sendOffset += CHUNK_SIZE;
+      const pct = Math.min(100, (sendOffset / total) * 100);
+      $('sendProgressBar').style.width = pct + '%';
+      $('sendProgressText').textContent =
+        `📤 ${sendIndex + 1}/${sendFiles.length}: ${file.name} — ${pct.toFixed(1)}% (${formatBytes(Math.min(sendOffset, total))} / ${formatBytes(total)})`;
+
+      if (sendOffset < total) {
+        readSlice(sendOffset);
+      } else {
+        resolve();
+      }
+    }
+
+    readSlice(0);
+  });
+}
+
+/* ============================================================
+   RECEIVER — Message handling
+   ============================================================ */
+function handleMessage(e) {
+  if (typeof e.data === 'string') {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'meta') {
+      currentIncomingFile = msg;
+      recvChunks = [];
+      recvReceived = 0;
+      addRecvFileRow(msg);
+      $('recvProgressWrap').classList.remove('hidden');
+      $('recvProgressText').classList.remove('hidden');
+    } else if (msg.type === 'done') {
+      $('recvProgressText').textContent = '✅ အားလုံး လက်ခံပြီးပါပြီ';
+    }
+  } else {
+    // binary chunk
+    recvChunks.push(e.data);
+    recvReceived += e.data.byteLength;
+
+    if (currentIncomingFile) {
+      const total = currentIncomingFile.size;
+      const pct = Math.min(100, (recvReceived / total) * 100);
+      $('recvProgressBar').style.width = pct + '%';
+      $('recvProgressText').textContent =
+        `📥 ${currentIncomingFile.name} — ${pct.toFixed(1)}% (${formatBytes(recvReceived)} / ${formatBytes(total)})`;
+
+      if (recvReceived >= total) {
+        saveReceivedFile();
+      }
+    }
+  }
+}
+
+function addRecvFileRow(meta) {
+  const box = $('recvFileList');
+  const row = document.createElement('div');
+  row.className = 'file-row';
+  row.innerHTML = `<span class="name">${meta.name}</span><span>${formatBytes(meta.size)}</span>`;
+  box.appendChild(row);
+}
+
+function saveReceivedFile() {
+  const blob = new Blob(recvChunks, { type: currentIncomingFile.mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentIncomingFile.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+  recvChunks = [];
+  recvReceived = 0;
+  currentIncomingFile = null;
+}
+
+/* ============================================================
+   Info note
+   ============================================================ */
+console.log('%cZapShare','color:#38bdf8;font-size:20px;font-weight:bold');
+console.log('P2P File Transfer — WebRTC DataChannel');
+</script>
+</body>
+</html>
